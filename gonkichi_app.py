@@ -12,7 +12,7 @@ import base64,io
 
 from shogi import fst,snd,Shogi
 from tsume_solver import TsumeSolver,autoTestMode
-from resource_base64 import dic_base64,icon_base64
+from resource_base64 import dic_base64,icon_base64,koma_base64
 
 nxt='next'
 suc='success'
@@ -130,6 +130,7 @@ class GonkichiApp:
         self.cand={True:[],False:[]}    #True:駒台から打つ、False：盤上の駒移動
         self.dicIdMarker = {}
         self.dicCanv={}
+        self.koma = {}
 
     def setup(self):
         self.setup_window()
@@ -188,9 +189,11 @@ class GonkichiApp:
     def drawKomaBan(self,ix,iy,owner,char):
         x,y=self.__Index2Coordinates(ix,iy)
         if owner==fst:
-            id_pol=self.canvas_ban.create_polygon(x,y-25,x-20,y-20,x-25,y+25,x+25,y+25,x+20,y-20,width=2,fill=self.colkoma,outline='black')
+            # id_pol=self.canvas_ban.create_polygon(x,y-25,x-20,y-20,x-25,y+25,x+25,y+25,x+20,y-20,width=2,fill=self.colkoma,outline='black')
+            id_pol = self.canvas_ban.create_image(x,y,image=self.koma[fst])
         else:
-            id_pol=self.canvas_ban.create_polygon(x,y+25,x-20,y+20,x-25,y-25,x+25,y-25,x+20,y+20,width=2,fill=self.colkoma,outline='black')
+            # id_pol=self.canvas_ban.create_polygon(x,y+25,x-20,y+20,x-25,y-25,x+25,y-25,x+20,y+20,width=2,fill=self.colkoma,outline='black')
+            id_pol = self.canvas_ban.create_image(x,y,image=self.koma[snd])
         self.lstIdBan.append(id_pol)
         
         self.lstIdBan.append(self.canvas_ban.create_image(x,y,image=self.dic_kimg[owner][char]))
@@ -200,10 +203,7 @@ class GonkichiApp:
         y=60
         for char in kdai[owr]:
             if kdai[owr][char]:
-                if owr==fst:
-                    self.dicIdDai[owr].append(canvas.create_polygon(x,y-25,x-20,y-20,x-25,y+25,x+25,y+25,x+20,y-20,width=2,fill=self.colkoma,outline='black'))
-                else:
-                    self.dicIdDai[owr].append(canvas.create_polygon(x,y+25,x-20,y+20,x-25,y-25,x+25,y-25,x+20,y+20,width=2,fill=self.colkoma,outline='black'))
+                self.dicIdDai[owr].append(canvas.create_image(x,y,image=self.koma[owr]))
                 self.dicIdDai[owr].append(canvas.create_image(x,y,image=self.dic_kimg[owr][char]))
                 self.dicIdDai[owr].append(canvas.create_text(x+60,y,font=('',24),text=str(len(kdai[owr][char]))))
             y+=self.wm
@@ -230,6 +230,12 @@ class GonkichiApp:
             self.dic_kimg[fst][char]=ImageTk.PhotoImage(image)
             self.dic_kimg[snd][char]=ImageTk.PhotoImage(rotateImage)
 
+        #駒画像（文字なし）
+        koma_bin = base64.b64decode(koma_base64)
+        koma_img = Image.open(io.BytesIO(koma_bin))
+        rotate_koma_img = koma_img.rotate(180,expand=1)
+        self.koma[fst]=ImageTk.PhotoImage(koma_img)
+        self.koma[snd]=ImageTk.PhotoImage(rotate_koma_img)
         
         image= Image.new("RGBA", (60, 60), (230, 120, 120, 128))
         self.imgMarker=ImageTk.PhotoImage(image)
