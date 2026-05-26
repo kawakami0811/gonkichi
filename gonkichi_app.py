@@ -7,12 +7,14 @@ from tkinter import END
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter.messagebox
-from PIL import Image, ImageTk, ImageDraw,ImageFont
+from PIL import Image, ImageTk
 import base64,io
 
 from shogi import fst,snd,Shogi
-from tsume_solver import TsumeSolver,autoTestMode
+from SolverUtils import autoTestMode
 from resource_base64 import dic_base64,icon_base64,koma_base64
+from tsume_solver2mdsc import TsumeSolver2mdsc
+# from tsume_solver3 import TsumeSolver3
 
 nxt='next'
 suc='success'
@@ -116,7 +118,9 @@ class GonkichiApp:
         self.shogi=None
         self.tsumeshg=None
         self.i_step=0
-        self.solver=TsumeSolver()
+        # self.solver=TsumeSolver()
+        self.solver2 = TsumeSolver2mdsc() #新Solver
+        # self.solver3 = TsumeSolver3() #IDDFS solver
         self.selection=koma_select()
         self.id_selmark=None
         self.imgMarker=None
@@ -283,7 +287,8 @@ class GonkichiApp:
         label_n.grid(row=0,column=1)
         self.btn_slv = tkinter.Button(frame_slvr, text='Solve' , command = self.slvbtn_pushed, font=FONT, bg='pink')
         self.btn_slv.grid(row=0,column=2,padx=10)
-        
+
+
         self.btn_init=tkinter.Button(frame_slvr,text='◀◀', command = self.initbtn_pushed, font=FONT, bg='gray',state=tkinter.DISABLED)
         self.btn_init.grid(row=0,column=3,padx=10)
         self.btn_bw=tkinter.Button(frame_slvr,text='◀', command = self.bwbtn_pushed, font=FONT, bg='gray',state=tkinter.DISABLED)
@@ -295,10 +300,10 @@ class GonkichiApp:
         self.btn_clr=tkinter.Button(frame_slvr,text='Clear', command = self.clrbtn_pushed, font=FONT, bg='gray',state=tkinter.DISABLED)
         self.btn_clr.grid(row=0,column=7,padx=10)
         
-        self.chuai=tkinter.BooleanVar()
-        self.chuai.set(False)
-        self.chbx_Chuai=tkinter.Checkbutton(frame_slvr, variable=self.chuai,text='中合い', font=FONT, command= self.chbx_chuaiModeCallBack)
-        self.chbx_Chuai.grid(row=0,column=9,padx=20)
+        # self.chuai=tkinter.BooleanVar()
+        # self.chuai.set(False)
+        # self.chbx_Chuai=tkinter.Checkbutton(frame_slvr, variable=self.chuai,text='中合い', font=FONT, command= self.chbx_chuaiModeCallBack)
+        # self.chbx_Chuai.grid(row=0,column=9,padx=20)
         
         self.GameMode=tkinter.BooleanVar()
         self.GameMode.set(False)
@@ -372,10 +377,6 @@ class GonkichiApp:
                 self.clrbtn_pushed()
 
         self.refreshDispBan() #利き表示をリフレッシュする。
-
-    def chbx_chuaiModeCallBack(self):
-        self.solver.ChuAiEnable = self.chuai.get()
-        # （TBD)GameMode時の候補手選び直し処理。玉側Waiting状態のときのみ。
 
     def svbtn_pushed(self):
         filename = filedialog.asksaveasfilename(filetypes=[('Pickle files','*.pickle')],defaultextension='pickle')
@@ -561,28 +562,27 @@ class GonkichiApp:
         #self.solver.ChuAiEnable = self.chuai.get()  #ver1.2 中合いEnableの値を取得してSolverにセットする。
     
         t_start=time.time()
-        self.solver.Solve(self.shogi,n)
+        self.solver2.Solve_mdsc(self.shogi,n)
         t_end=time.time()
         t_calc=round(t_end-t_start,3)
 
-        if self.solver.dictop=={}:
+        if self.solver2.dictop=={}:
             print('Failed to find solution')
             self.label_msg['text']='Failed to find solution! Please check and try again'
         else:
-            self.solver.HierPrintDic(None)
-            lst_ope=self.solver.GetSolution()
+            self.solver2.HierPrintDic(None)
+            lst_ope=self.solver2.GetSolution2()
             print('Solution found!',lst_ope)
-            self.label_msg['text']='Found solution!  in '+str(t_calc)+'[sec]  TotalCount:'+str(self.solver.TotalCnt)
+            self.label_msg['text']='Found solution!  in '+str(t_calc)+'[sec]  TotalCount:'+str(self.solver2.TotalCnt)
             if len(lst_ope) < n:    #実際にはより短い手数で解けたとき
                 self.tsumeshg.n_tedume=len(lst_ope)
-                self.label_msg['text']='Solved in fiewer steps'
+                self.label_msg['text']='Solved in fewer steps'
                 self.ent_n.delete(0,END)
                 self.ent_n.insert(0,len(lst_ope))
             self.tsumeshg.makeSolution(lst_ope)
             self.i_step=0
             self.enableButton(self.btn_clr)
             self.showSteps()
-            #self.shogi = self.tsumeshg.answer[n].copy()
 
     def clrbtn_pushed(self):
         self.i_step=0
@@ -859,36 +859,19 @@ class AppTest:
 
     def ExecuteGonkichiTest(self):
         today=datetime.datetime.today()
-        solver = TsumeSolver()
+        solver = TsumeSolver2mdsc()
         for tcFileName in self.tcList:
             print('****************TestCase:', tcFileName,'*********************',today, file=self.fp)
             with open (tcFileName,'rb') as file:
                 tsume=pickle.load(file)
             start=time.time()
-            solver.Solve(tsume.answer[0],tsume.n_tedume)
+            solver.Solve_mdsc(tsume.answer[0],tsume.n_tedume)
             end=time.time()
             solver.HierPrintDic(self.fp)
-            lstOpe=solver.GetSolution()
+            lstOpe=solver.GetSolution2()
             print('AnswerOperation:',lstOpe,file=self.fp)
             print('totalcount:{}, time:{}[sec]'.format(solver.TotalCnt,end-start),file=self.fp)
-        
-        solver.ChuAiEnable=True
-        print('///////////////////////中合いEnable///////////////////////////', file=self.fp)
-
-        for tcFileName in self.tcList2:
-            print('****************TestCase:', tcFileName,'*********************',today, file=self.fp)
-            with open (tcFileName,'rb') as file:
-                tsume=pickle.load(file)
-            start=time.time()
-            solver.Solve(tsume.answer[0],tsume.n_tedume)
-            end=time.time()
-            solver.HierPrintDic(self.fp)
-            lstOpe=solver.GetSolution()
-            print('AnswerOperation:',lstOpe,file=self.fp)
-            print('totalcount:{}, time:{}[sec]'.format(solver.TotalCnt,end-start),file=self.fp)
-        
-        return
-            
+                    
     def closeLogFile(self):
         self.fp.close()
         return

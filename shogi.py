@@ -1,4 +1,7 @@
 #shogi.py ますクラス、将棋クラス、駒クラスの定義
+from itertools import product
+
+PIECE_ORDER = ["歩", "香", "桂", "銀", "金", "角", "飛"]
 
 fst,snd="first","second"
 mix='mix'
@@ -321,6 +324,104 @@ class Shogi:
     def isChecked(self):
         x,y = self.Gyoku.pos
         return self.ban[x][y].rch[fst]!=[]
+
+    def isDaiEmpty(self,owner):
+        for char in self.kdai[owner]:
+            if self.kdai[owner][char]:
+                return False
+        return True
+
+    def get_string_ban(self, owner):
+        # owner の盤上の駒を位置 (y, x) でソート
+        sorted_kban = sorted(self.kban[owner], key=lambda k: (k.pos[1], k.pos[0]))
+
+        # 例: "S歩11,S金39,G銀28" のような形式
+        s = []
+        for koma in sorted_kban:
+            ox = koma.pos[0]
+            oy = koma.pos[1]
+            s.append(f"{koma.char}{ox}{oy}")
+        return ",".join(s)
+
+    def get_string_kdai(self, owner):
+        order = ['歩','香','桂','銀','金','角','飛']
+        s = []
+        for k in order:
+            count = len(self.kdai[owner][k])
+            s.append(f"{k}{count}")
+        return ",".join(s)
+
+    def __repr__(self):
+        f_ban = self.get_string_ban(fst)
+        g_ban = self.get_string_ban(snd)
+        f_dai = self.get_string_kdai(fst)
+
+        return f"{f_ban}|{g_ban}|{f_dai}"
+
+    def parse_hand_string(self,hand_str):
+        """
+        "歩0,香0,桂1,銀1,金0,角0,飛0"
+            → {"歩":0, "香":0, ...}
+        """
+        hand = {}
+        for item in hand_str.split(","):
+            piece = item[0]
+            num = int(item[1:])
+            hand[piece] = num
+        return hand
+
+    def hand_to_string(self,hand_dict):
+        """
+        {"歩":0, "香":0, ...}
+            → "歩0,香0,桂1,銀1,金0,角0,飛0"
+        """
+        return ",".join(f"{p}{hand_dict[p]}" for p in PIECE_ORDER)
+
+    def generate_fullkey_subsets(self,fullkey):
+        """
+        入力:
+            "龍51,歩64|桂70,玉80,歩83|歩0,香0,桂1,銀1,金0,角0,飛0"
+        出力:
+            [
+                "龍51,歩64|桂70,玉80,歩83|歩0,香0,桂0,銀0,金0,角0,飛0",
+                ...
+            ]
+            ※元の持ち駒と一致するものは除外
+        """
+        # 3つに分割
+        board_sente, board_gote, hand_str = fullkey.split("|")
+
+        # 持ち駒を dict に変換
+        original = self.parse_hand_string(hand_str)
+
+        # 各駒種ごとに 0〜元の枚数 の範囲を作る
+        ranges = [range(original[p] + 1) for p in PIECE_ORDER]
+
+        subsets = []
+        for combo in product(*ranges):
+            subset = {p: combo[i] for i, p in enumerate(PIECE_ORDER)}
+
+            # 元の持ち駒と完全一致なら除外
+            if all(subset[p] == original[p] for p in PIECE_ORDER):
+                continue
+
+            subsets.append(subset)
+
+        # 合計枚数が少ない順にソート（冗長手排除に有効）
+        subsets.sort(key=lambda d: sum(d.values()))
+
+        # フルキー形式に変換
+        fullkeys = []
+        for s in subsets:
+            new_hand_str = self.hand_to_string(s)
+            new_fullkey = f"{board_sente}|{board_gote}|{new_hand_str}"
+            fullkeys.append(new_fullkey)
+
+        return fullkeys
+
+
+
+
 
 class Koma:
     dir_G={"first":[[0,-1,1],[-1,-1,1],[1,-1,1],[-1,0,1],[1,0,1],[0,1,1]],"second":[[0,1,1],[-1,1,1],[1,1,1],[-1,0,1],[1,0,1],[0,-1,1]]}
