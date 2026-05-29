@@ -4,7 +4,59 @@ from operator import itemgetter
 
 from shogi import fst,snd,mix,Shogi
 from MyUtils import StopWatch
-from SolverUtils import ListOperator,Shogi_Operation,autoTestMode
+
+class Shogi_Operation:
+    d_owner={fst:'▲',snd:'▽'}
+    d_suji=('９','８','７','６','５','４','３','２','１')
+    d_dan=('一','ニ','三','四','五','六','七','八','九')
+    owner=''
+    isUchi=False
+    char=''
+    isNari=False
+    koma=None
+    toPos=[]
+    fromPos=[]
+    
+    def __init__(self,owner,uchi,char,nari,fpos,topos):
+        self.owner=owner
+        self.isUchi=uchi
+        self.char=char
+        self.isNari=nari
+        self.toPos=topos
+        self.fromPos=fpos
+        
+    def __repr__(self):
+        player=Shogi_Operation.d_owner[self.owner]
+        x,y=self.toPos
+        pos=Shogi_Operation.d_suji[x]+Shogi_Operation.d_dan[y]
+        ret=player+pos+self.char
+        if self.isUchi:
+            ret +='打'
+        else:
+            if self.isNari:
+                ret +='成'
+            ret += '  from'+str(self.fromPos)
+        ret+='to'+str(self.toPos)
+        return ret
+
+class ListOperator:
+
+    @staticmethod
+    def andList(list1,list2):
+        ret=[]
+        for i in list1:
+            if i in list2:
+                ret.append(i)
+        return ret
+
+    @staticmethod
+    def subList(list1,list2):
+        ret=list1.copy()
+        for i in list2:
+            if i in ret:
+                ret.remove(i)
+        return ret
+
 
 class TsumeSolver2mdsc:
     
@@ -337,18 +389,24 @@ class TsumeSolver2mdsc:
     
     def __searchMoveOute(self,shogi):
         OuteList = []
+
+        # 盤上の先手駒のループ
         for ikoma in shogi.kban[fst]:
             rchlst = ikoma.rch
             rchlst = ListOperator.subList(rchlst,shogi.distrib[fst])
+            # rchlst = set(rchlst)-distrib_f
             chkposlst = shogi.Gyoku.gen_chkposlst(ikoma.char,shogi.distrib[mix])
             chklst = ListOperator.andList(rchlst,chkposlst)
+            # chklst = rchlst & chkposlst
             self.dbgprint('__searchMoveOute'+ikoma.char+str(chklst))
 
             #成王手を先にする
             if ikoma.pchar and not ikoma.ispromoted:
                 chkposlst = shogi.Gyoku.gen_chkposlst(ikoma.pchar,shogi.distrib[mix])
                 chkposlst = ListOperator.subList(chkposlst,shogi.distrib[fst])
+                # chkposlst = set(chkposlst)-distrib_f
                 chklst2 = ListOperator.andList(rchlst,chkposlst)
+                # chklst2 = rchlst & chkposlst
             
                 for ipos in chklst2:
                     if ikoma.pos[1]<3 or ipos[1]<3:
@@ -381,14 +439,19 @@ class TsumeSolver2mdsc:
 
     def __searchUchiOute(self,Shogi):
         OuteList = []
-        for ichar in Shogi.kdai[fst].keys():
-                if Shogi.kdai[fst][ichar]:
-                    if ichar == '歩' and Shogi.FuDic[fst][Shogi.Gyoku.pos[0]]:
-                        continue   #二歩防止のため、候補手に入れない。打ち歩詰め防止は__VerifyOuteCandidateの詰み判定にて実施
-                    chkposlst=Shogi.Gyoku.gen_chkposlst(ichar,Shogi.distrib[mix])
-                    chkposlst=ListOperator.subList(chkposlst,Shogi.distrib[mix])
-                    for ipos in chkposlst:
-                        OuteList.append(Shogi_Operation(fst,True,ichar,False,None,ipos))
+
+        for ichar,komalist in Shogi.kdai[fst].items():
+            if not komalist:
+                continue
+            # 以下、持ち駒あるとき、持ち駒種類ごとに王手を抽出
+            if ichar == '歩' and Shogi.FuDic[fst][Shogi.Gyoku.pos[0]]:
+                continue   #二歩防止のため、候補手に入れない。打ち歩詰め防止は__VerifyOuteCandidateの詰み判定にて実施
+            #　王手可能位置
+            chkposlst=Shogi.Gyoku.gen_chkposlst(ichar,Shogi.distrib[mix])
+            chkposlst=ListOperator.subList(chkposlst,Shogi.distrib[mix])
+            # chkposlst=set(Shogi.Gyoku.gen_chkposlst(ichar,Shogi.distrib[mix]))-distrib_m
+            for ipos in chkposlst:
+                OuteList.append(Shogi_Operation(fst,True,ichar,False,None,ipos))
         self.dbgprint('__searchUchiOute'+str(OuteList))
 
         return OuteList
@@ -400,6 +463,8 @@ class TsumeSolver2mdsc:
             if flyer:
                 waycells=flyer.getInnerCells(ikoma.pos)+flyer.getOuterCells(ikoma.pos)
                 cells = ListOperator.subList(ikoma.rch,waycells+Shogi.distrib[fst])
+                # cells = set(ikoma.rch) - set(waycells+Shogi.distrib[fst])
+
                 for cell in cells:
                     if ikoma.pchar and not ikoma.ispromoted:    #成り優先
                         if ikoma.pos[1]<3 or cell[1]<3:
@@ -593,7 +658,7 @@ class TsumeSolver2mdsc:
         # print(txt)
         pass
 
-    def HierPrintDic(self,fp):
+    def HierPrintDic(self,fp=None):
 
         print(f"HierPrintDic: dic={self.dictop}")
 
@@ -608,7 +673,7 @@ class TsumeSolver2mdsc:
         for i_ope in next:
             if i_ope in dic.keys():
                 print('  *',dic[i_ope]['cnt'],i_ope,dic[i_ope]['success'])
-                if autoTestMode:
+                if fp:
                     print('  *',dic[i_ope]['cnt'],i_ope,dic[i_ope]['success'], file=fp)
                 self.__subHierPrintDic(dic[i_ope],count,fp)
             
@@ -624,7 +689,7 @@ class TsumeSolver2mdsc:
         for i_ope in next:
             if i_ope in dic:
                 print('    '*count,dic[i_ope]['cnt'],i_ope,dic[i_ope]['success'],f"empty:{dic[i_ope].get('empty',"-")}")
-                if autoTestMode:
+                if fp:
                     print('    '*count,dic[i_ope]['cnt'],i_ope,dic[i_ope]['success'],file=fp)
                 self.__subHierPrintDic(dic[i_ope],count,fp)
 

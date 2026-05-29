@@ -11,15 +11,11 @@ from PIL import Image, ImageTk
 import base64,io
 
 from shogi import fst,snd,Shogi
-from SolverUtils import autoTestMode
 from resource_base64 import dic_base64,icon_base64,koma_base64
 from tsume_solver2mdsc import TsumeSolver2mdsc
 # from tsume_solver3 import TsumeSolver3
 
-nxt='next'
-suc='success'
-no='#'
-
+autoTestMode = False
 
 class koma_select:
     koma=None   #komaオブジェクト指定
@@ -570,7 +566,7 @@ class GonkichiApp:
             print('Failed to find solution')
             self.label_msg['text']='Failed to find solution! Please check and try again'
         else:
-            self.solver2.HierPrintDic(None)
+            self.solver2.HierPrintDic()
             lst_ope=self.solver2.GetSolution2()
             print('Solution found!',lst_ope)
             self.label_msg['text']='Found solution!  in '+str(t_calc)+'[sec]  TotalCount:'+str(self.solver2.TotalCnt)
@@ -867,7 +863,7 @@ class AppTest:
             start=time.time()
             solver.Solve_mdsc(tsume.answer[0],tsume.n_tedume)
             end=time.time()
-            solver.HierPrintDic(self.fp)
+            solver.HierPrintDic(fp=self.fp)
             lstOpe=solver.GetSolution2()
             print('AnswerOperation:',lstOpe,file=self.fp)
             print('totalcount:{}, time:{}[sec]'.format(solver.TotalCnt,end-start),file=self.fp)

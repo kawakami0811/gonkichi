@@ -1,1 +1,4 @@
 pillow
+cython
+setuptools
+wheel
