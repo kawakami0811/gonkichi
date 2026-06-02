@@ -43,18 +43,12 @@ class ListOperator:
 
     @staticmethod
     def andList(list1,list2):
-        ret=[]
-        for i in list1:
-            if i in list2:
-                ret.append(i)
+        ret=[i for i in list1 if i in list2]
         return ret
 
     @staticmethod
     def subList(list1,list2):
-        ret=list1.copy()
-        for i in list2:
-            if i in ret:
-                ret.remove(i)
+        ret=[i for i in list1 if i not in list2]
         return ret
 
 

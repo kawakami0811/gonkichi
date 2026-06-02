@@ -756,10 +756,12 @@ class GonkichiApp:
     def searchDispCand(self):
         if not self.shogi.isChecked():
             owner=fst
-            cands = self.solver.searchOute(1,self.shogi)
+            cands = self.solver2.searchOute(self.shogi)
         else:
             owner=snd
-            cands = self.solver.searchUke(1,self.shogi)
+            cands,mudacands = self.solver2.searchUke(self.shogi)
+            for cell,mcands in mudacands:
+                cands += mcands
 
         if cands==[]:
             if owner==snd:
@@ -872,12 +874,12 @@ class AppTest:
         self.fp.close()
         return
 
-
-if autoTestMode:
-    at=AppTest()
-    at.autoTest()
-    
-else:
-    gapp=GonkichiApp()
-    gapp.setup()
+if __name__ == "__main__": 
+    if autoTestMode:
+        at=AppTest()
+        at.autoTest()
+        
+    else:
+        gapp=GonkichiApp()
+        gapp.setup()
 

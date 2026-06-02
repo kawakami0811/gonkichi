@@ -46,7 +46,7 @@ class StopWatch:
             print(f"{label}: {fmt.format(t)} sec")
         else:
             print(f"{fmt.format(t)} sec")
-        return t
+        return round(t,self.n_round)
 
     def show_laps(self):
         fmt = f"{{:.{self.n_round}f}}"
