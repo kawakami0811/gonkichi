@@ -38,6 +38,29 @@ class Shogi_Operation:
             ret += '  from'+str(self.fromPos)
         ret+='to'+str(self.toPos)
         return ret
+    
+    # ★ 値としての同一性を表すキー
+    def to_key(self):
+        return (
+            self.owner,
+            self.char,
+            self.isUchi,
+            self.isNari,
+            None if self.fromPos is None else tuple(self.fromPos),
+            tuple(self.toPos),
+        )
+
+    # ★ 値として同じなら True
+    def __eq__(self, other):
+        if not isinstance(other, Shogi_Operation):
+            return False
+        return self.to_key() == other.to_key()
+
+    # ★ 値として同じなら同じハッシュ値
+    def __hash__(self):
+        return hash(self.to_key())
+
+
 
 class ListOperator:
 
@@ -371,10 +394,13 @@ class TsumeSolver2mdsc:
         lst_uchiOute = self.__searchUchiOute(shogi)
         lst_HirakiOute = self.__searchHirakiOute(shogi)
         
-        for h in lst_HirakiOute.copy():
-            for m in lst_moveOute:
-                if h.char==m.char and h.isUchi==m.isUchi and h.isNari==m.isNari and h.toPos==m.toPos and h.fromPos==m.fromPos:
-                    lst_HirakiOute.remove(h)
+        # 開き王手と移動王手の重複している手を徐除去する
+        lst_HirakiOute = [h for h in lst_HirakiOute if h not in lst_moveOute]
+
+        # for h in lst_HirakiOute.copy():
+        #     for m in lst_moveOute:
+        #         if h.char==m.char and h.isUchi==m.isUchi and h.isNari==m.isNari and h.toPos==m.toPos and h.fromPos==m.fromPos:
+        #             lst_HirakiOute.remove(h)
 
         retlst = lst_uchiOute+lst_moveOute+lst_HirakiOute
 
