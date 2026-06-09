@@ -1,4 +1,4 @@
-#Gonkichi アプリ ver2.0 (アプリ刷新：Tryモード実装、Pin処理の修正、)
+#Gonkichi アプリ 2026.6 Slover2mdsc、中合いフラグ削除、中合い候補手表示(Gameモード）、cython対応
 import time
 import tkinter
 import pickle
@@ -10,12 +10,16 @@ import tkinter.messagebox
 from PIL import Image, ImageTk
 import base64,io
 
-from shogi import fst,snd,Shogi
+try:
+    from shogi_cy import fst,snd,Shogi
+    print("⚡⚡Using Shogi from shogi_cy.pyd")
+except:
+    from shogi import fst,snd,Shogi
+    print("■Using Shogi from shogi.py")
+
 from resource_base64 import dic_base64,icon_base64,koma_base64
 from tsume_solver2mdsc import TsumeSolver2mdsc
-# from tsume_solver3 import TsumeSolver3
 
-autoTestMode = False
 
 class koma_select:
     koma=None   #komaオブジェクト指定
@@ -28,7 +32,8 @@ class koma_select:
     
 class TsumeShogi:
     def __init__(self,shogi,n):
-        self.shogi=shogi.copy()
+        self.shogi=Shogi()
+        shogi.copyto(self.shogi)
         self.n_tedume = n
         self.hint=''
         self.answer=[]
@@ -37,7 +42,8 @@ class TsumeShogi:
     def makeSolution(self,lst):
         self.answer.append(self.shogi)
         for i in range(self.n_tedume):
-            shg=self.answer[i].copy()
+            shg=Shogi()
+            self.answer[i].copyto(shg)
             shg.DoOperation(lst[i])
             self.answer.append(shg)
         return
@@ -363,7 +369,9 @@ class GonkichiApp:
             self.gameState=StateGame()
             self.shogi.extend_reach_all()
             if not self.tsumeshg.answer:
-                self.tsumeshg.answer.append(self.shogi.copy())
+                cpyshg = Shogi()
+                self.shogi.copyto(cpyshg)
+                self.tsumeshg.answer.append(cpyshg)
             #候補手の探索と表示
 
             self.searchDispCand()
@@ -377,7 +385,9 @@ class GonkichiApp:
     def svbtn_pushed(self):
         filename = filedialog.asksaveasfilename(filetypes=[('Pickle files','*.pickle')],defaultextension='pickle')
         #print(DBG,'svbtn_pushed: file=',filename)
-        self.tsumeshg.shogi = self.shogi.copy()
+        cpyshg = Shogi()
+        self.shogi.copyto(cpyshg)
+        self.tsumeshg.shogi = cpyshg
         self.tsumeshg.n_tedume=int(self.ent_n.get())
         with open(filename,'wb') as file:
             pickle.dump(self.tsumeshg,file)
@@ -392,7 +402,7 @@ class GonkichiApp:
         self.label_msg['text']='Load:'+filepath
         if self.tsumeshg.answer==[]:
             self.clrbtn_pushed()
-            self.shogi=self.tsumeshg.shogi.copy()
+            self.shogi=self.tsumeshg.shogi.copyto(Shogi())
             self.ent_n.delete(0,END)
             self.ent_n.insert(0,self.tsumeshg.n_tedume)
             self.refreshDispBan()
@@ -589,7 +599,7 @@ class GonkichiApp:
         self.disableButton(self.btn_clr)
         self.label_msg['text']='arrange, set number , then push [Solve]'
         self.tsumeshg.answer=[]     #Answerをクリア
-        self.tsumeshg.answer.append(self.shogi.copy())
+        self.tsumeshg.answer.append(self.shogi.copyto(Shogi))
         return
 
     def initbtn_pushed(self):
@@ -628,7 +638,8 @@ class GonkichiApp:
         self.label_msg['text']= str(self.i_step)+"手目"
 
     def showSteps(self):
-        self.shogi=self.tsumeshg.answer[self.i_step].copy()
+        self.shogi=Shogi()
+        self.tsumeshg.answer[self.i_step].copyto(self.shogi)
         self.refreshDispBan()
         self.refreshDispDai()
         
@@ -741,7 +752,9 @@ class GonkichiApp:
             self.shogi.DoOperation(ope)
             #手順に追加してPlayボタンの有効無効をリフレッシュする
             self.tsumeshg.answer=self.tsumeshg.answer[0:self.i_step+1]
-            self.tsumeshg.answer.append(self.shogi.copy())
+            cpyshg = Shogi()
+            self.shogi.copyto(cpyshg)
+            self.tsumeshg.answer.append(cpyshg)
             self.i_step+=1
             self.refreshPlayButtons()
             self.dispStepNum()
@@ -801,85 +814,7 @@ class GonkichiApp:
     def dispSelMarkDai(self,canvas,iy,marker):
         self.dicIdMarker[canvas].append(canvas.create_image(60,60+self.wm*iy,image=marker))
 
-class AppTest:
-    def __init__(self):
-        self.tcList=[]
-        self.tcList2=[]
-        self.fp=None
-        self.logFileName=''
-        pass
-    
-    def autoTest(self):
-        self.setupLogfile()
-        self.setupGonkichiTestCase()
-        self.setupGonkichiTestCase2()
-        self.ExecuteGonkichiTest()
-        self.closeLogFile()
-        return
-    
-    def setupLogfile(self):
-        today=datetime.datetime.today()
-        self.logFileName='GonkichiTest\GonkichiAutoTestLog{}{:02d}{:02d}-{:02d}{:02d}.txt'.format(today.year,today.month,today.day,today.hour,today.minute)
-        print('setupLogfile fn=', self.logFileName)
-        self.fp=open(self.logFileName,'w')
-        return
-    
-    def setupGonkichiTestCase(self):
-
-        self.tcList.append('pickle\D36_9.pickle')
-        self.tcList.append('pickle\D37_9.pickle')
-        self.tcList.append('pickle\D46_9.pickle')
-        self.tcList.append('pickle\D56_9.pickle')
-        self.tcList.append('pickle\D96_9.pickle')
-        
-        self.tcList.append('pickle\D120_11.pickle')
-        self.tcList.append('pickle\D126_11.pickle')
-        self.tcList.append('pickle\D135_11.pickle')
-        self.tcList.append('pickle\D149_11.pickle')
-        self.tcList.append('pickle\D150_11.pickle')
-
-        self.tcList.append('pickle\D176_13.pickle')
-        self.tcList.append('pickle\D177_13.pickle')
-        self.tcList.append('pickle\D178_13.pickle')
-        self.tcList.append('pickle\D179_13.pickle')
-        self.tcList.append('pickle\D180_13.pickle')
-
-        self.tcList.append('pickle\D36_1手詰め.pickle')
-        self.tcList.append('pickle\Q162_7_uchiFuAvoid.pickle')
-        self.tcList.append('pickle\D165_11_bug.pickle')
-        self.tcList.append('pickle\D165_11.pickle')
-        return
-
-    def setupGonkichiTestCase2(self):
-        self.tcList2.append('pickle\kyoufu4_15.pickle')
-        self.tcList2.append('pickle\中合い打ち歩詰め_13_ver12.pickle')
-        self.tcList2.append('pickle\Q164_7_5.pickle')
-
-    def ExecuteGonkichiTest(self):
-        today=datetime.datetime.today()
-        solver = TsumeSolver2mdsc()
-        for tcFileName in self.tcList:
-            print('****************TestCase:', tcFileName,'*********************',today, file=self.fp)
-            with open (tcFileName,'rb') as file:
-                tsume=pickle.load(file)
-            start=time.time()
-            solver.Solve_mdsc(tsume.answer[0],tsume.n_tedume)
-            end=time.time()
-            solver.HierPrintDic(fp=self.fp)
-            lstOpe=solver.GetSolution2()
-            print('AnswerOperation:',lstOpe,file=self.fp)
-            print('totalcount:{}, time:{}[sec]'.format(solver.TotalCnt,end-start),file=self.fp)
-                    
-    def closeLogFile(self):
-        self.fp.close()
-        return
-
 if __name__ == "__main__": 
-    if autoTestMode:
-        at=AppTest()
-        at.autoTest()
-        
-    else:
-        gapp=GonkichiApp()
-        gapp.setup()
+    gapp=GonkichiApp()
+    gapp.setup()
 

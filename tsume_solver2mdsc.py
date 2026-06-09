@@ -2,7 +2,12 @@
 
 from operator import itemgetter
 
-from shogi import fst,snd,mix,Shogi
+try:
+    from shogi_cy import fst,snd,mix,Shogi
+    print("⚡⚡Using Shogi from shogi_cy.pyd")
+except:
+    from shogi import fst,snd,mix,Shogi
+    print("■Using Shogi from shogi.py")
 from MyUtils import StopWatch
 
 class Shogi_Operation:
@@ -167,12 +172,14 @@ class TsumeSolver2mdsc:
 
         for oute in dic['next']:
             dic1 = dic[oute]
-            shogi_oute = shogi.copy()
+            shogi_oute = Shogi()
+            shogi.copyto(shogi_oute)
             shogi_oute.DoOperation(oute)
 
             for uke in dic1['next']:
 
-                shogi_uke = shogi_oute.copy()
+                shogi_uke = Shogi()
+                shogi_oute.copyto(shogi_uke)
                 shogi_uke.DoOperation(uke)
                 key = str(shogi_uke)
                 keys_subset = shogi_uke.generate_fullkey_subsets(key)
@@ -199,7 +206,8 @@ class TsumeSolver2mdsc:
         for ope in nexts:
             dic1 = dic[ope]
             dic1['cnt']=count
-            shogi1 = shogi.copy()
+            shogi1 = Shogi()
+            shogi.copyto(shogi1)
             shogi1.DoOperation(ope)
 
             if dic1['next'] == []:
@@ -218,7 +226,8 @@ class TsumeSolver2mdsc:
         count += 1
         self.TotalCnt += 1
 
-        shogitmp=shogi.copy()
+        shogitmp=Shogi()
+        shogi.copyto(shogitmp)
         shogitmp.DoOperation(Cand)
 
         ukeCands,mudaCands = self.searchUke(shogitmp)
@@ -288,7 +297,8 @@ class TsumeSolver2mdsc:
     def __verifyUkeCandidate(self,count,shogi:Shogi,def_cand,dict,check_muda=False,limit_depth=0):
         self.TotalCnt += 1
         count+=1
-        tmp_shogi = shogi.copy()
+        tmp_shogi = Shogi()
+        shogi.copyto(tmp_shogi)
         tmp_shogi.DoOperation(def_cand)
 
         # MapDicに局面があれば（すでに詰み筋があれば）、この知見を利用する。
@@ -328,7 +338,8 @@ class TsumeSolver2mdsc:
         valid_cands = []
         
         for cell,lst_ope in mudaCands:
-            shogitmp = shogi.copy()
+            shogitmp = Shogi()
+            shogi.copyto(shogitmp)
             shogitmp.DoOperation(lst_ope[0]) #一手しか検証しない。どうせ取られる駒なので。
             outeCands = self.__searchMoveOute_on_cell(shogitmp,cell)
 
@@ -374,7 +385,8 @@ class TsumeSolver2mdsc:
         count+=1
         pair_cands=[]
         for icand in cands:
-            shgtmp=shogi.copy()
+            shgtmp=Shogi()
+            shogi.copyto(shgtmp)
             shgtmp.DoOperation(icand)
             ukecands,mudacands=self.searchUke(shgtmp)
             
@@ -397,10 +409,6 @@ class TsumeSolver2mdsc:
         # 開き王手と移動王手の重複している手を徐除去する
         lst_HirakiOute = [h for h in lst_HirakiOute if h not in lst_moveOute]
 
-        # for h in lst_HirakiOute.copy():
-        #     for m in lst_moveOute:
-        #         if h.char==m.char and h.isUchi==m.isUchi and h.isNari==m.isNari and h.toPos==m.toPos and h.fromPos==m.fromPos:
-        #             lst_HirakiOute.remove(h)
 
         retlst = lst_uchiOute+lst_moveOute+lst_HirakiOute
 
@@ -640,39 +648,8 @@ class TsumeSolver2mdsc:
 
         return UkeOpeList+idoUkeOpeList,mudaAiCandsSet
     
-    # 無駄合い検証により使わなくなったメソッド
-    # def __isFocus(self,shogi,cell,flyer,otekoma):
-    #     outercells = flyer.getOuterCells(cell)
-    #     if outercells:
-    #         x,y=outercells[0]
-    #         if shogi.ban[x][y].isOpen():
-    #             tmpshg=shogi.copy()
-    #             tmpshg.DoOperation(Shogi_Operation(fst,False,otekoma.char,False,otekoma.pos,cell))
-    #             cands=self.__searchNigeUke(0,tmpshg)
-    #             cands+=self.__searchToriUke(0,tmpshg)
-    #             if cands:
-    #                 return True
-    #     return False
-    
     def __isBlocking(self,shogi,koma):
         return shogi.isBlocking(koma)
-
-    # 無駄合い検証により使わなくなったメソッド
-    # def __isAigomakikazu(self, outekoma,cell,shogi):
-    #     shogitmp = shogi.copy()
-    #     x,y = outekoma.pos
-    #     if outekoma.pos[1]<3 or cell[1]<3:
-    #         ope = Shogi_Operation(fst,False,outekoma.char,True,outekoma.pos,cell)
-    #     else:
-    #         ope = Shogi_Operation(fst,False,outekoma.char,False,outekoma.pos,cell)
-    #     shogitmp.DoOperation(ope)
-
-    #     cands = self.__searchNigeUke(shogitmp) + self.__searchToriUke(shogitmp)
-
-    #     if cands == []:
-    #         return True
-    #     else:
-    #         return False
 
     def dbgprint(self,txt):
         # print(txt)
@@ -702,8 +679,6 @@ class TsumeSolver2mdsc:
     def __subHierPrintDic(self,dic,count,fp):
 
         count+=1
-        # if count>self.MaxStep:
-        #     return
         
         next=dic['next']
         for i_ope in next:

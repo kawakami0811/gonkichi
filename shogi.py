@@ -13,10 +13,6 @@ class Masu:
         self.rch = {fst:[],snd:[]}
         self.str_owner=''
         self.pos=[i,j]
-        if i==0:
-            self.str_rtn="\n　"
-        else:
-            self.str_rtn=' '
 
     def get_koma(self):
         return(self.__sit)
@@ -28,26 +24,6 @@ class Masu:
 
     def isOpen(self):
         return(not self.__sit)
-
-    def get_sitting_debug(self):
-        if self.__sit:
-            return self.str_rtn+self.str_owner+self.__sit.char+"　,"
-        else:    
-            return self.str_rtn+" - 　,"
-
-    def get_reach_debug(self,fs):
-        txt=''
-        blank=' '
-        n=len(self.rch[fs])
-        if n<4:
-            for i in self.rch[fs]:
-                txt=txt+i.char
-            for i in range(3-n):
-                txt=txt+blank
-        else:
-            for i in range(3):
-                txt=txt+self.rch[fs][i].char
-        return self.str_rtn+txt+','
     
     def set_koma(self,koma):
         if self.__sit:
@@ -70,15 +46,6 @@ class Shogi:
                   ,snd:{'歩':[],'飛':[],'角':[],'香':[],'桂':[],'銀':[],'金':[]}}
         self.kban={fst:[] , snd:[]}
         self.FuDic={fst:[False for i in range(9)],snd:[False for i in range(9)]}
-
-    def get_debug_ban(self):
-        txt,txt_fr,txt_sr = '','',''
-        for j in range(9):
-            for i in range(9):
-                txt=txt+self.ban[i][j].get_sitting_debug()
-                txt_fr=txt_fr+self.ban[i][j].get_reach_debug(fst)
-                txt_sr=txt_sr+self.ban[i][j].get_reach_debug(snd)
-        return txt,txt_fr,txt_sr
 
     def remove_reach(self,koma):
         #print('remove_reach:' , koma,koma.rch)
@@ -263,40 +230,41 @@ class Shogi:
 
         return
     
-    def copy(self):
-        shgcpy=Shogi()
-        shgcpy.gen_komas()
+    # copy→copytoに変更。Shogiクラスメソッド内でShogiインスタンス生成するのCythonに向いていないらしい。
+    def copyto(self,newshg):
+
+        newshg.gen_komas()
         #Gyoku
         x,y=self.Gyoku.pos
-        shgcpy.warp_koma(shgcpy.Gyoku,x,y)
+        newshg.warp_koma(newshg.Gyoku,x,y)
         #snd koma
         for skoma in self.kban[snd]:
             if skoma.char=='玉':
                 continue
             x,y=skoma.pos
             if skoma.ispromoted:
-                shgcpy.put_koma(snd,Shogi.komadic[skoma.char],x,y)
-                shgcpy.ban[x][y].get_koma().promote()
+                newshg.put_koma(snd,Shogi.komadic[skoma.char],x,y)
+                newshg.ban[x][y].get_koma().promote()
             else:
-                shgcpy.put_koma(snd,skoma.char,x,y)
+                newshg.put_koma(snd,skoma.char,x,y)
         #fst koma ban
         for fkoma in self.kban[fst]:
             x,y=fkoma.pos
             if fkoma.ispromoted:
-                shgcpy.change_owner_kdai(snd,fst,Shogi.komadic[fkoma.char])
-                shgcpy.put_koma(fst,Shogi.komadic[fkoma.char],x,y)
-                shgcpy.ban[x][y].get_koma().promote()
+                newshg.change_owner_kdai(snd,fst,Shogi.komadic[fkoma.char])
+                newshg.put_koma(fst,Shogi.komadic[fkoma.char],x,y)
+                newshg.ban[x][y].get_koma().promote()
             else:
-                shgcpy.change_owner_kdai(snd,fst,fkoma.char)
-                shgcpy.put_koma(fst,fkoma.char,x,y)
+                newshg.change_owner_kdai(snd,fst,fkoma.char)
+                newshg.put_koma(fst,fkoma.char,x,y)
         #fst koma dai
         for fkomachar in self.kdai[fst]:
             for fkoma in self.kdai[fst][fkomachar]:
-                shgcpy.change_owner_kdai(snd,fst,fkomachar)
+                newshg.change_owner_kdai(snd,fst,fkomachar)
         #extend reach all
-        shgcpy.extend_reach_all()
+        newshg.extend_reach_all()
         
-        return shgcpy
+        return newshg
     
     def count_komadai(self,owner):
         nkoma = 0
