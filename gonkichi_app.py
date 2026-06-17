@@ -47,7 +47,8 @@ class TsumeShogi:
             shg.DoOperation(lst[i])
             self.answer.append(shg)
         return
-            
+
+# ステイタスの親クラス       
 class GAppState:
     def __init__(self):
         pass
@@ -67,6 +68,7 @@ class GAppState:
     def onClickSndKdai(self,app,event):
         raise NotImplementedError("You should implement this method!!")
 
+# 駒ならべステイタス
 class StateArrange(GAppState):
     def onClickBan(self,app,event):
         app.onClickBan_arr(event)
@@ -82,7 +84,8 @@ class StateArrange(GAppState):
 
     def onClickSndKdai(self,app,event):
         app.onClickSndKdai_arr(event)
-    
+
+# 将棋ゲームステイタス
 class StateGame(GAppState):
     def onClickBan(self,app,event):
         #print("Gamemode")
@@ -102,7 +105,7 @@ class StateGame(GAppState):
         print("Gamemode")
         app.onClickSndKdai_game(event)
 
-
+# 詰将棋アプリ「言吉」本体
 class GonkichiApp:
 
     wm=60   #一マスの幅　縦横同じ（正方形）

@@ -3,6 +3,7 @@
 Python で実装した詰将棋ソルバーです。  
 深さ優先探索による詰み探索エンジンと、Tkinter を用いた簡易 GUI アプリケーションを含みます。
  * (New)無駄合い検証機能・冗長手順削除機能を追加して、回答の品質を大幅の向上させました。
+ * (New)ロジック高速化とCythonDLL化によって約7倍の高速化をしました。
 
 ---
 
@@ -17,6 +18,7 @@ Python で実装した詰将棋ソルバーです。
 - (New)局面キャッシュ(MapDic)による高速化・冗長手順削除
 - (New)最大手数・持ち駒使い切り・盤上先手駒数最小による最適回答選択
 - 性能：1秒間に約8000~10000手探索できます。(Core-i7)
+　　　→(New)約2万手（Python）、約4万手(Cython)に向上しました！
 - 性能：13手詰めくらいまでなら10分程度あればだいたい解けます。
 - 性能(New)：中合いを含む問題も正しく解くことができます。
 
@@ -97,6 +99,8 @@ Gonkichi/ ├── gonkichi_app.py
           ├── shogi.py
           ├── resource_base64.py
           ├── MyUtils.py
+          ├── SolverUtils_cy.cp312-win_amd64.pyd
+          ├── shogi_cy.cp312-win_amd64.pyd
           ├── requirements.txt
           ├── README.md
           └── pickle/ ├── オリジナル7手詰め.pickle 

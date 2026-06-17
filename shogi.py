@@ -1,12 +1,14 @@
 #shogi.py ますクラス、将棋クラス、駒クラスの定義
+#  Cython化済み（shogi_cy.cp312-win_amd64.pyd)
 from itertools import product
 
 PIECE_ORDER = ["歩", "香", "桂", "銀", "金", "角", "飛"]
 
 fst,snd="first","second"
+enemy = {fst:snd,snd:fst}
 mix='mix'
 
-
+# ますクラス
 class Masu:
     def __init__(self,i,j):
         self.__sit = False
@@ -37,6 +39,29 @@ class Masu:
             self.str_owner="▼"
         #print('Masu:set_koma', koma.char,self.pos,koma.owner,self.__sit)
 
+    def get_sitting_debug(self):
+        if self.__sit:
+            return self.str_rtn+self.str_owner+self.__sit.char+"　,"
+        else:    
+            return self.str_rtn+" - 　,"
+
+    def get_reach_debug(self,fs):
+        txt=''
+        blank=' '
+        n=len(self.rch[fs])
+        if n<4:
+            for i in self.rch[fs]:
+                txt=txt+i.char
+            for i in range(3-n):
+                txt=txt+blank
+        else:
+            for i in range(3):
+                txt=txt+self.rch[fs][i].char
+        return self.str_rtn+txt+','
+    
+
+
+# 将棋クラス（盤面＋持ち駒）
 class Shogi:
     komadic={'龍':'飛','馬':'角','全':'銀','圭':'桂','杏':'香','と':'歩'}
     def __init__(self):
@@ -164,9 +189,7 @@ class Shogi:
             self.ban[x][y].rch[koma.owner].append(koma)
 
     def DoOperation(self,ope):
-        #print('Shogi:DoOperation',ope.owner,ope.char,ope.fromPos,'→',ope.toPos,'打ち',ope.isUchi,'成',ope.isNari)
-        if ope.char == '金' and ope.toPos == self.Gyoku.pos:
-            print('error')
+
         if ope.isUchi:
             x,y=ope.toPos
             self.put_koma(ope.owner,ope.char,x,y)
@@ -179,16 +202,20 @@ class Shogi:
         else:
             x,y=ope.fromPos
             koma=self.ban[x][y].get_koma()
-            self.Game_move_koma(koma, ope.toPos,ope.isNari)
+            self.Game_move_koma(koma, ope.toPos,ope.isNari,ope)
         return
 
-    def Game_move_koma(self,koma,topos,Nari):
+    def Game_move_koma(self,koma,topos,Nari,ope=None):
         self.remove_reach(koma)
         x,y=koma.pos
         self.ban[x][y].pop_koma()
         xd,yd=topos
         if not self.ban[xd][yd].isOpen():    #相手の駒をとるとき。
             ckoma=self.ban[xd][yd].pop_koma()
+            if ope: #opeの結果を記録する
+                ope.captured = ckoma
+                if ckoma.ispromoted:
+                    ope.wascapNari = True
             if ckoma.char=='歩': #FuDicのメンテナンス
                 self.FuDic[ckoma.owner][xd]=False
             if ckoma.owner == koma.owner:
@@ -216,6 +243,69 @@ class Shogi:
                 self.remove_reach(ikoma)
                 self.extend_reach(ikoma,self.distrib[mix])
         #self.__gen_distrib() 重複処理になるので削除
+
+    # opeの手を戻す
+    def UndoOperation(self,ope):
+        xd,yd=ope.toPos
+
+        if ope.isUchi: #打った駒を駒台に戻す    
+            koma = self.ban[xd][yd].pop_koma()
+            self.remove_reach(koma)
+            self.kdai[ope.owner][ope.char].append(koma)
+            self.kban[ope.owner].remove(koma)
+            self.__gen_distrib()
+            if koma.char == "歩":
+                self.FuDic[ope.owner][xd] = False
+            for ikoma in self.ban[xd][yd].rch[fst] + self.ban[xd][yd].rch[snd]:    #戻したことで駒の効き道が通るときの考慮
+                if ikoma.canFly: #香・飛・角道の効きを駒を打つ前に戻す
+                    poslst = ikoma.extend_rch(self.distrib[mix])
+                    for x,y in poslst:
+                        self.ban[x][y].rch[ikoma.owner].append(ikoma)
+
+        else:   #　動いた手を元に戻す
+            x,y = ope.fromPos
+            owner = ope.owner
+            another = enemy[owner]
+
+            #駒の位置を元に戻し、効きを削除する。
+            koma=self.ban[xd][yd].pop_koma()
+            self.remove_reach(koma)
+            self.ban[x][y].set_koma(koma)
+
+            # 成なら戻す
+            if ope.isNari:
+                koma.reset()
+
+            ckoma = ope.captured
+            if ckoma:
+                self.kdai[owner][ckoma.char].remove(ckoma)
+                ckoma.chg_owner(another)
+                self.ban[xd][yd].set_koma(ckoma)
+                self.kban[another].append(ckoma)
+                if ope.wascapNari:
+                    ckoma.promote()
+                elif ckoma.char == "歩":
+                    self.FuDic[another][xd]=True
+
+            self.__gen_distrib()
+            self.extend_reach(koma,self.distrib[mix])
+            if ckoma:
+                self.extend_reach(ckoma,self.distrib[mix])
+            
+            for ikoma in self.ban[x][y].rch[fst] + self.ban[x][y].rch[snd]:    #戻したことで駒の効き道が塞がるときの考慮
+                if ikoma.canFly: #自分自身は除く
+                    self.remove_reach(ikoma)
+                    self.extend_reach(ikoma,self.distrib[mix])
+            if not ckoma:
+                for ikoma in self.ban[xd][yd].rch[fst] + self.ban[xd][yd].rch[snd]:    #戻したことで駒の効き道が通るときの考慮
+                    if ikoma != koma and ikoma.canFly: #自分自身は除く
+                        poslst = ikoma.extend_rch(self.distrib[mix])
+                        for xp,yp in poslst:
+                            self.ban[xp][yp].rch[ikoma.owner].append(ikoma)
+            
+      
+
+
 
     def move_koma(self,koma,topos,Nari):
         self.remove_reach(koma)
@@ -387,10 +477,18 @@ class Shogi:
 
         return fullkeys
 
+    def get_debug_ban(self):
+        txt,txt_fr,txt_sr = '','',''
+        for j in range(9):
+            for i in range(9):
+                txt=txt+self.ban[i][j].get_sitting_debug()
+                txt_fr=txt_fr+self.ban[i][j].get_reach_debug(fst)
+                txt_sr=txt_sr+self.ban[i][j].get_reach_debug(snd)
+
+        return txt,txt_fr,txt_sr
 
 
-
-
+# 駒クラス（具体的な駒の親クラス）
 class Koma:
     dir_G={"first":[[0,-1,1],[-1,-1,1],[1,-1,1],[-1,0,1],[1,0,1],[0,1,1]],"second":[[0,1,1],[-1,1,1],[1,1,1],[-1,0,1],[1,0,1],[0,-1,1]]}
     dir_S={"first":[[0,-1,1],[-1,-1,1],[1,-1,1],[-1,1,1],[1,1,1]],"second":[[0,1,1],[-1,1,1],[1,1,1],[-1,-1,1],[1,-1,1]]}

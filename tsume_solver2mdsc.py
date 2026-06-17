@@ -2,7 +2,7 @@
 
 from operator import itemgetter
 
-try:
+try:    #　CythonのDLL(shogi_cy*.pyd)がimport可能なときは使う、ダメならPythonを使う
     from shogi_cy import fst,snd,mix,Shogi
     print("⚡⚡Using Shogi from shogi_cy.pyd")
 except:
@@ -10,76 +10,13 @@ except:
     print("■Using Shogi from shogi.py")
 from MyUtils import StopWatch
 
-class Shogi_Operation:
-    d_owner={fst:'▲',snd:'▽'}
-    d_suji=('９','８','７','６','５','４','３','２','１')
-    d_dan=('一','ニ','三','四','五','六','七','八','九')
-    owner=''
-    isUchi=False
-    char=''
-    isNari=False
-    koma=None
-    toPos=[]
-    fromPos=[]
-    
-    def __init__(self,owner,uchi,char,nari,fpos,topos):
-        self.owner=owner
-        self.isUchi=uchi
-        self.char=char
-        self.isNari=nari
-        self.toPos=topos
-        self.fromPos=fpos
-        
-    def __repr__(self):
-        player=Shogi_Operation.d_owner[self.owner]
-        x,y=self.toPos
-        pos=Shogi_Operation.d_suji[x]+Shogi_Operation.d_dan[y]
-        ret=player+pos+self.char
-        if self.isUchi:
-            ret +='打'
-        else:
-            if self.isNari:
-                ret +='成'
-            ret += '  from'+str(self.fromPos)
-        ret+='to'+str(self.toPos)
-        return ret
-    
-    # ★ 値としての同一性を表すキー
-    def to_key(self):
-        return (
-            self.owner,
-            self.char,
-            self.isUchi,
-            self.isNari,
-            None if self.fromPos is None else tuple(self.fromPos),
-            tuple(self.toPos),
-        )
+try:    #　CythonのDLL(SolverUtils_cy*.pyd)がimport可能なときは使う、ダメならPythonを使う
+    from SolverUtils_cy import Shogi_Operation,SearchOute
+    print("⚡⚡⚡SolverUtils_cy imported!!")
+except:
+    from SolverUtils import Shogi_Operation,SearchOute
 
-    # ★ 値として同じなら True
-    def __eq__(self, other):
-        if not isinstance(other, Shogi_Operation):
-            return False
-        return self.to_key() == other.to_key()
-
-    # ★ 値として同じなら同じハッシュ値
-    def __hash__(self):
-        return hash(self.to_key())
-
-
-
-class ListOperator:
-
-    @staticmethod
-    def andList(list1,list2):
-        ret=[i for i in list1 if i in list2]
-        return ret
-
-    @staticmethod
-    def subList(list1,list2):
-        ret=[i for i in list1 if i not in list2]
-        return ret
-
-
+# ソルバークラス　DFM・無駄合い検証・詰み手順マッピング・冗長手順削除
 class TsumeSolver2mdsc:
     
     def __init__(self):
@@ -141,6 +78,7 @@ class TsumeSolver2mdsc:
             return True
         return False
 
+    # DFS本体　Solve_mdscから呼ばれる。
     def Solve_Dfs(self,shogi,MaxStep):
 
         self.dictop={}
@@ -165,6 +103,7 @@ class TsumeSolver2mdsc:
                 return True
         return False #この手数では詰まなかった。
     
+    # 詰み手順マップ（MapDic)を使って冗長手順を削除する
     def remove_redundancy(self,shogi, dic):
    
         if not dic['next']:
@@ -199,6 +138,7 @@ class TsumeSolver2mdsc:
                 self.remove_redundancy(shogi_uke,dic2)
         return
 
+    # (1)冗長手削除によって壊れた手数をカウントし直す　(2)持ち駒の使い切り、先手盤上駒数を記録する
     def reorganize_dic(self,shogi:Shogi,dic,count):
         count +=1
 
@@ -219,15 +159,21 @@ class TsumeSolver2mdsc:
         
         return
 
+    # 王手の検証：王手に対する応手がないとき、またはすべての応手が失敗したときにTrueをかえし、それ以外はFalseを返す。
     def __VerifyOuteCandidate(self,count,shogi:Shogi,Cand,dict,check_muda=False,limit_depth=0):
+
         # 通常はself.MaxStepを使用、無駄合い検証中なら引数を使う。
         max_step = limit_depth if limit_depth else self.MaxStep
 
         count += 1
         self.TotalCnt += 1
 
-        shogitmp=Shogi()
-        shogi.copyto(shogitmp)
+        #DEBUG UndoOperation不具合　list.remove(x): x not in list
+        # print(f"__VerifyOuteCandidate cout:{count},Cand:{Cand},muda:{check_muda},limit:{limit_depth}")
+
+        # shogitmp=Shogi()
+        # shogi.copyto(shogitmp)
+        shogitmp = shogi #高速化のためCopyやめてUndoを使う！
         shogitmp.DoOperation(Cand)
 
         ukeCands,mudaCands = self.searchUke(shogitmp)
@@ -235,12 +181,15 @@ class TsumeSolver2mdsc:
             print('  ',Cand,'受け候補手',len(ukeCands),':',ukeCands)
         if ukeCands==[]:
             if Cand.char=='歩' and Cand.isUchi:
+                shogi.UndoOperation(Cand)
                 return False    #打ち歩詰めは失敗
             #　ここでは詰み判定をしない。ukeCandだけでなく、mudaCandsも含めた詰み判定を下のコードで行う。
 
         elif count == max_step: #手数になったが詰まなかった→MaxStepの次の受け手があったとき
+            shogi.UndoOperation(Cand)
             return False
         elif count > max_step:
+            shogi.UndoOperation(Cand)
             raise Exception(f"__VerifyOuteCandidate: count:{count},max_step:{max_step},check_muda:{check_muda}")
        
         #王手候補手Candに対して、すべての受け候補ukaCnadを検証する。すべての受けが失敗すればCandは成功、ひとつでもukeCandが成功すればCandは失敗
@@ -250,6 +199,7 @@ class TsumeSolver2mdsc:
             ukeret = self.__verifyUkeCandidate(count,shogitmp,uke_cand,ukedic,check_muda=check_muda)
 
             if ukeret: #受け候補手のひとつでも成功したら
+                shogi.UndoOperation(Cand)
                 return False
             else:
                 localdict[uke_cand]=ukedic
@@ -272,6 +222,7 @@ class TsumeSolver2mdsc:
             cur_depth = self.__getDepth(muda_localdict,ukeCands,count)
             valid_cands = self.__validateMudaCands(count,shogitmp,mudaCands,cur_depth)
             if valid_cands and count == max_step: #手数になったが詰まなかった→MaxStepの次の受け手があったとき
+                shogi.UndoOperation(Cand)
                 return False
             for uke_cand in valid_cands:
                 # print(f"有効中合い：{uke_cand}")
@@ -279,6 +230,7 @@ class TsumeSolver2mdsc:
                 ukeret = self.__verifyUkeCandidate(count,shogitmp,uke_cand,ukedic)
 
                 if ukeret: #受け候補手のひとつでも成功したら
+                    shogi.UndoOperation(Cand)
                     return False
                 else:
                     localdict[uke_cand]=ukedic
@@ -292,13 +244,23 @@ class TsumeSolver2mdsc:
             dict['empty']=True
         dict.update(localdict)
         
+        #高速化のためCopyやめてUndoを使う！
+        shogi.UndoOperation(Cand)
+
         return True
 
+   # 応手の検証：応手に対して王手がないとき、またはすべての王手が失敗したときにTrueをかえし、それ以外はFalseを返す。
     def __verifyUkeCandidate(self,count,shogi:Shogi,def_cand,dict,check_muda=False,limit_depth=0):
         self.TotalCnt += 1
         count+=1
-        tmp_shogi = Shogi()
-        shogi.copyto(tmp_shogi)
+
+        # #DEBUG UndoOperation不具合　list.remove(x): x not in list
+        # print(f"__verifyUkeCandidate cout:{count},Cand:{def_cand},muda:{check_muda},limit:{limit_depth}")
+
+        #高速化のためCopyやめてUndoを使う！
+        # tmp_shogi = Shogi()
+        # shogi.copyto(tmp_shogi)
+        tmp_shogi = shogi
         tmp_shogi.DoOperation(def_cand)
 
         # MapDicに局面があれば（すでに詰み筋があれば）、この知見を利用する。
@@ -308,7 +270,7 @@ class TsumeSolver2mdsc:
         if use_cashe and key in self.MapDic:
             dict.update(self.copy_dic(self.MapDic[key]))
             # print(f"Used MapDic :shogi ={key}")
-
+            shogi.UndoOperation(def_cand)
             return False
 
         OuteCands = self.searchOute(tmp_shogi)
@@ -330,16 +292,20 @@ class TsumeSolver2mdsc:
                     if not key in self.MapDic: #先に見つかったほうが短い手順なので上書きはしない。
                         self.MapDic[key]=dict.copy()    #ここは浅いコピーでOK
 
+                shogi.UndoOperation(def_cand)
                 return False
-        
+            
+        shogi.UndoOperation(def_cand)
         return True
 
+    # 無駄合い検証：合いゴマ候補手のリストをもとに、有効合いゴマ（合いゴマによって詰み手順が＋2手以上になるもの）のリストを返す
     def __validateMudaCands(self,count,shogi,mudaCands,d_max):
         valid_cands = []
         
         for cell,lst_ope in mudaCands:
-            shogitmp = Shogi()
-            shogi.copyto(shogitmp)
+            # shogitmp = Shogi()
+            # shogi.copyto(shogitmp)
+            shogitmp = shogi
             shogitmp.DoOperation(lst_ope[0]) #一手しか検証しない。どうせ取られる駒なので。
             outeCands = self.__searchMoveOute_on_cell(shogitmp,cell)
 
@@ -353,7 +319,9 @@ class TsumeSolver2mdsc:
 
             if not tsumi:
                 valid_cands+= lst_ope
-
+            
+            shogitmp.UndoOperation(lst_ope[0])
+        
         return valid_cands
     
     def __getDepth(self,dict,UkeCands,count):
@@ -400,21 +368,12 @@ class TsumeSolver2mdsc:
 
         return retcands
 
+    # 可能なすべての王手のリストを返す（Cython高速化済み：SolverUtils_cy.cp312-win_amd64.pyd）
     def searchOute(self,shogi):
 
-        lst_moveOute = self.__searchMoveOute(shogi)
-        lst_uchiOute = self.__searchUchiOute(shogi)
-        lst_HirakiOute = self.__searchHirakiOute(shogi)
-        
-        # 開き王手と移動王手の重複している手を徐除去する
-        lst_HirakiOute = [h for h in lst_HirakiOute if h not in lst_moveOute]
+        return SearchOute(shogi)
 
-
-        retlst = lst_uchiOute+lst_moveOute+lst_HirakiOute
-
-        self.dbgprint('__searchOute'+str(retlst))
-        return retlst
-    
+    # *現在不使用:SolverUtilsに移動済み*　盤上の駒による王手のリストを返す
     def __searchMoveOute(self,shogi):
         OuteList = []
 
@@ -448,6 +407,7 @@ class TsumeSolver2mdsc:
         self.dbgprint('__searchMoveOute'+str(OuteList))
         return OuteList
     
+    # 無駄合い検証のときのみ使用。合いゴマを取る王手のリストを返す。このメソッドを使用中！
     def __searchMoveOute_on_cell(self,Shogi,cell):
         OuteList = []
         x,y = cell
@@ -465,6 +425,7 @@ class TsumeSolver2mdsc:
         
         return OuteList
 
+    # *現在不使用:SolverUtilsに移動済み*　駒を打つ王手のリストを返す
     def __searchUchiOute(self,Shogi):
         OuteList = []
 
@@ -484,6 +445,7 @@ class TsumeSolver2mdsc:
 
         return OuteList
     
+    # *現在不使用:SolverUtilsに移動済み*　開き王手のリストを返す    
     def __searchHirakiOute(self,Shogi):
         OuteList = []
         for ikoma in Shogi.kban[fst]:
@@ -508,6 +470,7 @@ class TsumeSolver2mdsc:
 
         return OuteList
 
+    # 王手に対する応手のリストを返す
     def searchUke(self,shogi):
         lst_Tori = self.__searchToriUke(shogi)
         lst_Nige = self.__searchNigeUke(shogi)
@@ -516,6 +479,7 @@ class TsumeSolver2mdsc:
         self.dbgprint('__searchUke'+str(lst_Nige+lst_Tori+lst_aigoma))
         return lst_Tori+lst_Nige+lst_aigoma,mudaCandsLst
 
+    # 玉が逃げる応手のリストを返す
     def __searchNigeUke(self,shogi):
         xg,yg=shogi.Gyoku.pos
         outeKomaLst = shogi.ban[xg][yg].rch[fst]
@@ -552,6 +516,7 @@ class TsumeSolver2mdsc:
         #print('__searchNigeUke',UkeOpeList)
         return UkeOpeList        
 
+    # 王手している駒を取る応手のリストを返す
     def __searchToriUke(self,shogi):
         UkeOpeList =[]
         xg,yg=shogi.Gyoku.pos
@@ -581,6 +546,7 @@ class TsumeSolver2mdsc:
         #print('__searchToriUke',UkeOpeList)
         return UkeOpeList
 
+    #　合いゴマする応手（移動合い含む）のリストと、無駄合い候補手（セル・候補手リストのリスト）を返す
     def __searchAigoma(self,shogi):
         idoUkeOpeList=[]
         UkeOpeList =[]
@@ -589,10 +555,10 @@ class TsumeSolver2mdsc:
         otekomalst = shogi.ban[xg][yg].rch[fst]
 
 
-        if len(otekomalst)!=1:  #ダブル王手のときは間駒はできない
+        if len(otekomalst)!=1:  #ダブル王手のときは合い駒はできない
             return [],[]
         
-        if not otekomalst[0].canFly:
+        if not otekomalst[0].canFly:    # 飛車・角・香・龍・馬　以外の駒からの王手には合い駒なし
             return [],[]
         
         mudaAiCandsSet = []
@@ -690,6 +656,7 @@ class TsumeSolver2mdsc:
 
         return
 
+    # 回答ツリーから正解手順（最大手数・無知ゴマ使い切り、先手盤上駒数最小）を取得する
     def GetSolution2(self):
         if self.dictop == {}:
             print('could not find sokution in ',self.MaxStep,'steps')
