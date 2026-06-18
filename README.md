@@ -6,6 +6,18 @@ Python で実装した詰将棋ソルバーです。
  * (New)ロジック高速化とCythonDLL化によって約7倍の高速化をしました。
 
 ---
+## 🖥️ 動作環境
+本ソルバーは以下の環境で動作確認しています。
+
+Windows 64bit
+ - Python 3.12（Cython DLL が動作）
+ - Python 3.14（Cython は無効、Python 実装に自動フォールバック）
+ - 追加パッケージ：pillow
+
+Cython DLL（shogi_cy.cp312-win_amd64.pyd / SolverUtils_cy.cp312-win_amd64.pyd）は
+Windows 64bit + Python 3.12 専用です。
+それ以外の環境では DLL がロードされず、
+自動的に Python 実装に切り替わります（機能は同じですが速度は低下します）。
 
 ## 🔧 機能概要
 
