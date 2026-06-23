@@ -17,6 +17,8 @@ except:
     from shogi import fst,snd,Shogi
     print("■Using Shogi from shogi.py")
 
+from shogi import Shogi as Shogi_py
+
 from resource_base64 import dic_base64,icon_base64,koma_base64
 from tsume_solver2mdsc import TsumeSolver2mdsc
 
@@ -32,7 +34,7 @@ class koma_select:
     
 class TsumeShogi:
     def __init__(self,shogi,n):
-        self.shogi=Shogi()
+        self.shogi=Shogi_py()
         shogi.copyto(self.shogi)
         self.n_tedume = n
         self.hint=''
@@ -42,7 +44,7 @@ class TsumeShogi:
     def makeSolution(self,lst):
         self.answer.append(self.shogi)
         for i in range(self.n_tedume):
-            shg=Shogi()
+            shg=Shogi_py()
             self.answer[i].copyto(shg)
             shg.DoOperation(lst[i])
             self.answer.append(shg)
@@ -388,7 +390,7 @@ class GonkichiApp:
     def svbtn_pushed(self):
         filename = filedialog.asksaveasfilename(filetypes=[('Pickle files','*.pickle')],defaultextension='pickle')
         #print(DBG,'svbtn_pushed: file=',filename)
-        cpyshg = Shogi()
+        cpyshg = Shogi_py()
         self.shogi.copyto(cpyshg)
         self.tsumeshg.shogi = cpyshg
         self.tsumeshg.n_tedume=int(self.ent_n.get())
