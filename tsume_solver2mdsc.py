@@ -196,7 +196,7 @@ class TsumeSolver2mdsc:
         localdict={}
         for uke_cand in ukeCands:
             ukedic = {}
-            ukeret = self.__verifyUkeCandidate(count,shogitmp,uke_cand,ukedic,check_muda=check_muda)
+            ukeret = self.__verifyUkeCandidate(count,shogitmp,uke_cand,ukedic,check_muda=check_muda,limit_depth=limit_depth)
 
             if ukeret: #受け候補手のひとつでも成功したら
                 shogi.UndoOperation(Cand)
