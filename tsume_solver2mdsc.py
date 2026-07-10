@@ -40,9 +40,9 @@ class TsumeSolver2mdsc:
                 for ii in countdic:
                     print(f"探索深さ:{ii} , 探索手数：{countdic[ii]} ")
                 #デバッグ：MapDicキー一覧
-                print("デバッグ：MapDicキー一覧")
-                for key in self.MapDic:
-                    print(f"key={key}")
+                # print("デバッグ：MapDicキー一覧")
+                # for key in self.MapDic:
+                #     print(f"key={key}")
                 
                 self.remove_redundancy(shogi,self.dictop)
                 self.reorganize_dic(shogi,self.dictop,0)
@@ -68,12 +68,27 @@ class TsumeSolver2mdsc:
             # for key in self.MapDic:
             #     print(f"key={key}")
             sw.end().show(label='探索終了')
+
+            # # 不具合調査
+            # with open("dic_debug0705_original.txt" , "w", encoding="utf-8") as fp:
+            #     self.HierPrintDic(fp=fp)
+    
             #　MapDicを用いた冗長手順削除
             self.remove_redundancy(shogi,self.dictop)
             sw.end().show(label='冗長手順削除完了')
+
+            # # 不具合調査
+            # with open("dic_debug0705_before_reorganize.txt" , "w", encoding="utf-8") as fp:
+            #     self.HierPrintDic(fp=fp)
+
             #　正解dictionaryの再構築
             self.reorganize_dic(shogi,self.dictop,0)
             sw.end().show(label='ツリー再構築完了')
+
+            # #不具合調査
+            # with open("dic_debug0705_after_reorganize.txt" , "w", encoding="utf-8") as fp:
+            #     self.HierPrintDic(fp=fp)
+
 
             return True
         return False
@@ -127,7 +142,8 @@ class TsumeSolver2mdsc:
                 for key_sub in keys_subset:
                     if key_sub in self.MapDic:
                         # shortcut =self.MapDic[key_sub] 不具合0521修正
-                        shortcut =self.copy_dic(self.MapDic[key_sub])
+                        depth,mdic = self.MapDic[key_sub] #depthは使わない
+                        shortcut = self.copy_dic(mdic)
                         print(f"Solver.remove_redundancy: found_shortcut in {key_sub}")
                         break
                 if shortcut:
@@ -142,13 +158,25 @@ class TsumeSolver2mdsc:
     def reorganize_dic(self,shogi:Shogi,dic,count):
         count +=1
 
-        nexts = dic['next']
+        nexts = list(dic['next']) # ループの中で要素を削除する可能性があるので、コピーしておく
         for ope in nexts:
             dic1 = dic[ope]
             dic1['cnt']=count
             shogi1 = Shogi()
             shogi.copyto(shogi1)
-            shogi1.DoOperation(ope)
+
+            try:
+                shogi1.DoOperation(ope)
+            except:
+                # 不具合対応 2026.7.2　★ 不正な後手の打ち駒だけ削除する ★
+                # remove_redndancyの副作用で後手が持っていない合いゴマが候補手に入ってしまうことあり。
+                if ope.isUchi and ope.owner == snd:
+                    dic['next'].remove(ope)
+                    del dic[ope]
+                    continue
+                else:
+                    # 先手の打ち駒や通常手で例外が出るのは異常なので raise
+                    raise
 
             if dic1['next'] == []:
                 dic1['empty']=shogi1.isDaiEmpty(fst)
@@ -158,6 +186,10 @@ class TsumeSolver2mdsc:
             self.reorganize_dic(shogi1,dic1,count)
         
         return
+
+    # 詰将棋検証用のパブリック王手検証メソッド
+    def VerifyOuteCand(self,count,shogi:Shogi,Cand,dict):
+        return self.__VerifyOuteCandidate(count,shogi,Cand,dict)
 
     # 王手の検証：王手に対する応手がないとき、またはすべての応手が失敗したときにTrueをかえし、それ以外はFalseを返す。
     def __VerifyOuteCandidate(self,count,shogi:Shogi,Cand,dict,check_muda=False,limit_depth=0):
@@ -267,11 +299,13 @@ class TsumeSolver2mdsc:
         use_cashe = not check_muda
         key = str(tmp_shogi)
         # 探索時はMapDicを使うのやめる。作るだけにする。
+        # 手数超過不具合調査の対応としてコメントアウト。探索中はMapDic使わない
         if use_cashe and key in self.MapDic:
-            dict.update(self.copy_dic(self.MapDic[key]))
-            # print(f"Used MapDic :shogi ={key}")
-            shogi.UndoOperation(def_cand)
-            return False
+            depth,mdic = self.MapDic[key]
+            if count<=depth: #階層がより深い詰筋のみを利用する。
+                dict.update(self.copy_dic(mdic))
+                shogi.UndoOperation(def_cand)
+                return False
 
         OuteCands = self.searchOute(tmp_shogi)
 
@@ -290,7 +324,11 @@ class TsumeSolver2mdsc:
                     # if key=="飛52,歩82,桂63,歩64|桂70,玉80,歩83|歩0,香0,桂0,銀0,金0,角0,飛0":
                     #     print(f"Saving_dict to MapDic:{dict}")
                     if not key in self.MapDic: #先に見つかったほうが短い手順なので上書きはしない。
-                        self.MapDic[key]=dict.copy()    #ここは浅いコピーでOK
+                        self.MapDic[key]=(count,dict.copy()) #ここは浅いコピーでOK
+                    else:
+                        depth,mdic = self.MapDic[key]
+                        if depth<count: #同じ局面でも手が深いところの（短い）詰み筋を優先する
+                            self.MapDic[key] = (count,dict.copy())  #ここは浅いコピーでOK
 
                 shogi.UndoOperation(def_cand)
                 return False

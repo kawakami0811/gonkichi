@@ -3,7 +3,8 @@
 Python で実装した詰将棋ソルバーです。  
 深さ優先探索による詰み探索エンジンと、Tkinter を用いた簡易 GUI アプリケーションを含みます。
  * (New)無駄合い検証機能・冗長手順削除機能を追加して、回答の品質を大幅の向上させました。
- * (New)ロジック高速化とCythonDLL化によって約7倍の高速化をしました。
+ * (New)ロジック高速化とCythonDLL化によって約7倍(毎秒4万手以上)の高速化をしました。
+ * (New)詰将棋検証ソフトVerikichi_protoをリリースしました。
 
 ---
 ## 🖥️ 動作環境
@@ -33,6 +34,8 @@ Windows 64bit + Python 3.12 専用です。
 　　　→(New)約2万手（Python）、約4万手(Cython)に向上しました！
 - 性能：13手詰めくらいまでなら10分程度あればだいたい解けます。
 - 性能(New)：中合いを含む問題も正しく解くことができます。
+
+ - 新機能(New)：詰将棋の検証ソフトを追加しました。最短手数、駒余、余詰めの検証ができます。
 
 ---
 
@@ -103,6 +106,10 @@ Windows 64bit + Python 3.12 専用です。
 (pip install pillow)
 python gonkichi_app.py
 
+詰将棋検証(New)
+ (Verikichi_proto.pyのINPUTパラメータを設定して)
+ python Verikichi_proto.py
+
 ## 📂 ディレクトリ構成
 ```
 Gonkichi/ ├── gonkichi_app.py
@@ -111,6 +118,7 @@ Gonkichi/ ├── gonkichi_app.py
           ├── shogi.py
           ├── resource_base64.py
           ├── MyUtils.py
+          ├── Verikichi_proto.py
           ├── SolverUtils_cy.cp312-win_amd64.pyd
           ├── shogi_cy.cp312-win_amd64.pyd
           ├── requirements.txt
